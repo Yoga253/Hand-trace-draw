@@ -25,37 +25,43 @@ def angle(p1, p2, p3):
     return np.degrees(np.arccos(np.clip(cosine, -1.0, 1.0)))
 
 def detect_shape(points):
-    if len(points) < 20:
+    contour = np.array(points, dtype=np.int32)
+    if len(contour) < 3:
         return "Too few points"
 
-    contour = np.array(points).reshape((-1, 1, 2)).astype(np.int32)
-    area = cv2.contourArea(contour)
-    if area < 100:
-        return "Too small to detect"
-
+    contour = contour.reshape((-1, 1, 2))
     epsilon = 0.02 * cv2.arcLength(contour, True)
     approx = cv2.approxPolyDP(contour, epsilon, True)
-    vertices = len(approx)
 
-    if vertices == 3:
+    sides = len(approx)
+
+    if sides == 3:
         return "Triangle"
-    elif vertices == 4:
-        # Check aspect ratio
+    elif sides == 4:
+        # Use bounding box to determine if square or rectangle
         x, y, w, h = cv2.boundingRect(approx)
-        aspect_ratio = w / float(h)
-        if 0.9 <= aspect_ratio <= 1.1:
+        aspect_ratio = float(w) / h
+        if 0.95 < aspect_ratio < 1.05:
             return "Square"
         else:
             return "Rectangle"
-    elif vertices > 6:
-        perimeter = cv2.arcLength(contour, True)
-        circularity = 4 * math.pi * area / (perimeter * perimeter)
-        if circularity > 0.7:
-            return "Circle"
-        else:
-            return "Ellipse"
+    elif sides == 5:
+        return "Pentagon"
+    elif sides == 6:
+        return "Hexagon"
+    elif sides >= 7 and sides <= 10:
+        return "Circle"
     else:
-        return f"Polygon ({vertices} sides)"
+        # Try ellipse fitting for more complex or smooth shapes
+        if len(contour) >= 5:
+            ellipse = cv2.fitEllipse(contour)
+            major, minor = ellipse[1]
+            if abs(major - minor) < 10:
+                return "Circle (fitted)"
+            else:
+                return "Ellipse"
+        return f"Polygon ({sides} sides)"
+
 
 # --- Start Webcam ---
 cap = cv2.VideoCapture(0)
