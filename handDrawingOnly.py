@@ -5,14 +5,18 @@ mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(max_num_hands=1)
 mp_draw = mp.solutions.drawing_utils
 
-points = []
+history = []  # List of stroke lists
+current_stroke = []
 drawing = False
 pen_down = True
 eraser_mode = False
 
 def erase_near(x, y, radius=30):
-    global points
-    points = [pt if pt is None or ((pt[0]-x)**2 + (pt[1]-y)**2)**0.5 > radius else None for pt in points]
+    global history
+    for stroke in history:
+        for i, pt in enumerate(stroke):
+            if pt is not None and ((pt[0]-x)**2 + (pt[1]-y)**2)**0.5 <= radius:
+                stroke[i] = None
 
 cap = cv2.VideoCapture(0)
 
@@ -32,11 +36,18 @@ while True:
             x, y = int(tip.x * w), int(tip.y * h)
 
             if drawing and pen_down and not eraser_mode:
-                points.append((x, y))
+                current_stroke.append((x, y))
             elif eraser_mode:
                 erase_near(x, y, radius=30)
 
             mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+
+    # Rebuild points from history
+    points = []
+    for stroke in history:
+        points.extend(stroke)
+        points.append(None)
+    points.extend(current_stroke)
 
     for i in range(1, len(points)):
         if points[i - 1] and points[i]:
@@ -64,12 +75,17 @@ while True:
         drawing = not drawing
     elif key == ord('w'):
         pen_down = not pen_down
-        if not pen_down:
-            points.append(None)
+        if not pen_down and current_stroke:
+            history.append(current_stroke)
+            current_stroke = []
     elif key == ord('e'):
         eraser_mode = not eraser_mode
     elif key == ord('c'):
-        points.clear()
+        history.clear()
+        current_stroke.clear()
+    elif key == ord('z'):  # 'z' for undo
+        if history:
+            history.pop()
 
 cap.release()
 cv2.destroyAllWindows()
