@@ -19,7 +19,7 @@ def undo_last_stroke():
     if not points:
         return
     
-    # Find the last stroke by looking for the last None separator
+
     last_none_index = -1
     for i in range(len(points) - 1, -1, -1):
         if points[i] is None:
@@ -27,10 +27,8 @@ def undo_last_stroke():
             break
     
     if last_none_index == -1:
-        # No None found, remove all points (first stroke)
         points.clear()
     else:
-        # Remove everything after the last None
         points = points[:last_none_index]
 
 cap = cv2.VideoCapture(0)
@@ -89,7 +87,7 @@ while True:
         eraser_mode = not eraser_mode
     elif key == ord('c'):
         points.clear()
-    elif key == 26:  # Ctrl+Z
+    elif key == 26:  
         undo_last_stroke()
 
 cap.release()
