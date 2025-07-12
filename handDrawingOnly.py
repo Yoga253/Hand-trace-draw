@@ -5,18 +5,33 @@ mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(max_num_hands=1)
 mp_draw = mp.solutions.drawing_utils
 
-history = []  # List of stroke lists
-current_stroke = []
+points = []
 drawing = False
 pen_down = True
 eraser_mode = False
 
 def erase_near(x, y, radius=30):
-    global history
-    for stroke in history:
-        for i, pt in enumerate(stroke):
-            if pt is not None and ((pt[0]-x)**2 + (pt[1]-y)**2)**0.5 <= radius:
-                stroke[i] = None
+    global points
+    points = [pt if pt is None or ((pt[0]-x)**2 + (pt[1]-y)**2)**0.5 > radius else None for pt in points]
+
+def undo_last_stroke():
+    global points
+    if not points:
+        return
+    
+    # Find the last stroke by looking for the last None separator
+    last_none_index = -1
+    for i in range(len(points) - 1, -1, -1):
+        if points[i] is None:
+            last_none_index = i
+            break
+    
+    if last_none_index == -1:
+        # No None found, remove all points (first stroke)
+        points.clear()
+    else:
+        # Remove everything after the last None
+        points = points[:last_none_index]
 
 cap = cv2.VideoCapture(0)
 
@@ -36,18 +51,11 @@ while True:
             x, y = int(tip.x * w), int(tip.y * h)
 
             if drawing and pen_down and not eraser_mode:
-                current_stroke.append((x, y))
+                points.append((x, y))
             elif eraser_mode:
                 erase_near(x, y, radius=30)
 
             mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
-
-    # Rebuild points from history
-    points = []
-    for stroke in history:
-        points.extend(stroke)
-        points.append(None)
-    points.extend(current_stroke)
 
     for i in range(1, len(points)):
         if points[i - 1] and points[i]:
@@ -75,17 +83,14 @@ while True:
         drawing = not drawing
     elif key == ord('w'):
         pen_down = not pen_down
-        if not pen_down and current_stroke:
-            history.append(current_stroke)
-            current_stroke = []
+        if not pen_down:
+            points.append(None)
     elif key == ord('e'):
         eraser_mode = not eraser_mode
     elif key == ord('c'):
-        history.clear()
-        current_stroke.clear()
-    elif key == ord('z'):  # 'z' for undo
-        if history:
-            history.pop()
+        points.clear()
+    elif key == 26:  # Ctrl+Z
+        undo_last_stroke()
 
 cap.release()
 cv2.destroyAllWindows()
